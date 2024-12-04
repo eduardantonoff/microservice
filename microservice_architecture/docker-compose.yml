@@ -1,0 +1,61 @@
+version: '3.8'  # Updated to a more recent version
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  features:
+    build:
+      context: ./features
+    restart: always
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  model:
+    build:
+      context: ./model
+    restart: always
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      features:
+        condition: service_started
+    volumes:
+      - ./model/src/myfile.pkl:/usr/src/app/myfile.pkl
+
+  metric:
+    build:
+      context: ./metric
+    restart: always
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      model:
+        condition: service_started
+    volumes:
+      - ./logs:/usr/src/app/logs
+
+  plot:
+    build:
+      context: ./plot
+    restart: always
+    depends_on:
+      metric:
+        condition: service_started
+    volumes:
+      - ./logs:/usr/src/app/logs
